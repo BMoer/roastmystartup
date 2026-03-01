@@ -2,8 +2,11 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import AvatarVC from '@/components/AvatarVC';
-import AvatarBeamter from '@/components/AvatarBeamter';
+import AvatarFranky from '@/components/AvatarFranky';
+import AvatarPflichtner from '@/components/AvatarPflichtner';
+import AvatarSabine from '@/components/AvatarSabine';
+import AvatarFlorian from '@/components/AvatarFlorian';
+import AvatarRenate from '@/components/AvatarRenate';
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -27,7 +30,7 @@ export default function Home() {
     try {
       new URL(finalUrl);
     } catch {
-      setError('Das sieht nicht nach einer gültigen URL aus');
+      setError('Das sieht nicht nach einer g\u00fcltigen URL aus');
       return;
     }
 
@@ -37,20 +40,31 @@ export default function Home() {
   return (
     <main className="landing">
       <div className="landing-avatars">
-        <div className="landing-avatar landing-avatar--vc">
-          <AvatarVC size={100} />
+        <div className="landing-avatar" style={{ animationDelay: '0s' }}>
+          <AvatarFranky size={80} />
         </div>
-        <div className="landing-avatar landing-avatar--beamter">
-          <AvatarBeamter size={100} />
+        <div className="landing-avatar" style={{ animationDelay: '0.3s' }}>
+          <AvatarPflichtner size={80} />
+        </div>
+        <div className="landing-avatar" style={{ animationDelay: '0.6s' }}>
+          <AvatarSabine size={80} />
+        </div>
+        <div className="landing-avatar" style={{ animationDelay: '0.9s' }}>
+          <AvatarFlorian size={80} />
+        </div>
+        <div className="landing-avatar" style={{ animationDelay: '1.2s' }}>
+          <AvatarRenate size={80} />
         </div>
       </div>
 
       <h1 className="landing-title">
         Roast my Startup
       </h1>
+      <p className="landing-edition">Austria Edition</p>
       <p className="landing-subtitle">
-        Zwei Perspektiven, die kein Startup hören will.<br />
-        Ein VC-Bro und ein Wiener Grantler bewerten deine Website.
+        F&uuml;nf &ouml;sterreichische Archetypen + ein Silicon-Valley-VC-Bro bewerten deine Website.
+        <br />
+        Finde heraus, was &Ouml;sterreich wirklich von deiner Idee h&auml;lt.
       </p>
 
       <form onSubmit={handleSubmit} className="url-form">
@@ -64,7 +78,7 @@ export default function Home() {
             autoFocus
           />
           <button type="submit" className="url-submit">
-            Roast it 🔥
+            Roast it
           </button>
         </div>
         {error && <p className="url-error">{error}</p>}

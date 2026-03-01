@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePersona } from '@/context/PersonaContext';
-import type { ScrapedContent } from '@/types';
+import { AT_PERSONAS } from '@/types';
+import type { ScrapedContent, ATPersonaId } from '@/types';
 
 interface Props {
   url: string;
@@ -17,13 +18,27 @@ export default function RoastFrame({ url, scrapedContent, onSectionVisible, onRe
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const bridgeReady = useRef(false);
   const pendingInit = useRef(false);
-  const { mode, roastData } = usePersona();
+  const { roastData } = usePersona();
 
   const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
 
-  // Send init to bridge when both bridge is ready and roast data is available
+  // Build persona color map from AT_PERSONAS
+  const personaColors: Record<string, string> = {};
+  for (const p of AT_PERSONAS) {
+    personaColors[p.id] = p.color;
+  }
+
+  // Build AT-only roast data (exclude chad)
+  const atRoastData = roastData ? {
+    franky: roastData.franky,
+    pflichtner: roastData.pflichtner,
+    sabine: roastData.sabine,
+    florian: roastData.florian,
+    renate: roastData.renate,
+  } : null;
+
   const sendInit = useCallback(() => {
-    if (!bridgeReady.current || !roastData || !scrapedContent) {
+    if (!bridgeReady.current || !atRoastData || !scrapedContent) {
       pendingInit.current = true;
       return;
     }
@@ -34,21 +49,11 @@ export default function RoastFrame({ url, scrapedContent, onSectionVisible, onRe
     iframe.contentWindow.postMessage({
       type: 'roast-init',
       sectionIds,
-      roastData,
-      mode,
+      atRoastData,
+      personaColors,
     }, '*');
     pendingInit.current = false;
-  }, [roastData, scrapedContent, mode]);
-
-  // Send mode changes to bridge
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe?.contentWindow || !bridgeReady.current) return;
-    iframe.contentWindow.postMessage({
-      type: 'roast-set-mode',
-      mode,
-    }, '*');
-  }, [mode]);
+  }, [roastData, scrapedContent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Listen for bridge messages
   useEffect(() => {

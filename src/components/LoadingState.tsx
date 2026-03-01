@@ -1,7 +1,10 @@
 'use client';
 
-import AvatarVC from './AvatarVC';
-import AvatarBeamter from './AvatarBeamter';
+import AvatarFranky from './AvatarFranky';
+import AvatarPflichtner from './AvatarPflichtner';
+import AvatarSabine from './AvatarSabine';
+import AvatarFlorian from './AvatarFlorian';
+import AvatarRenate from './AvatarRenate';
 
 interface Props {
   stage: 'scraping' | 'generating' | 'done';
@@ -14,11 +17,20 @@ export default function LoadingState({ stage }: Props) {
     <div className="loading-overlay">
       <div className="loading-content">
         <div className="loading-avatars">
-          <div className="loading-avatar loading-avatar--vc">
-            <AvatarVC size={80} />
+          <div className="loading-avatar" style={{ animationDelay: '0s' }}>
+            <AvatarFranky size={64} />
           </div>
-          <div className="loading-avatar loading-avatar--beamter">
-            <AvatarBeamter size={80} />
+          <div className="loading-avatar" style={{ animationDelay: '0.2s' }}>
+            <AvatarPflichtner size={64} />
+          </div>
+          <div className="loading-avatar" style={{ animationDelay: '0.4s' }}>
+            <AvatarSabine size={64} />
+          </div>
+          <div className="loading-avatar" style={{ animationDelay: '0.6s' }}>
+            <AvatarFlorian size={64} />
+          </div>
+          <div className="loading-avatar" style={{ animationDelay: '0.8s' }}>
+            <AvatarRenate size={64} />
           </div>
         </div>
         <div className="loading-text">

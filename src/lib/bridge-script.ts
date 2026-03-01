@@ -2,6 +2,9 @@
  * Returns a JavaScript string to be injected into the proxied iframe.
  * This runs inside the iframe — NOT as React. It communicates with the
  * parent via postMessage.
+ *
+ * Shows annotations from ALL 5 AT personas simultaneously, limited to
+ * 2-3 per section in a round-robin pattern for the "Minenfeld" feel.
  */
 export function getBridgeScript(): string {
   return `
@@ -9,10 +12,9 @@ export function getBridgeScript(): string {
   if (window.__roastBridgeLoaded) return;
   window.__roastBridgeLoaded = true;
 
-  var sectionData = null;
-  var currentMode = '';
+  var atRoastData = null; // { franky: {sectionRoasts}, pflichtner: ..., etc }
+  var personaColors = {}; // personaId -> color hex
   var headingMap = {}; // sectionId -> DOM element
-  var annotationEls = {}; // sectionId -> annotation DOM element
   var observer = null;
   var bottomReported = false;
 
@@ -22,27 +24,33 @@ export function getBridgeScript(): string {
     '@import url("https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;700&display=swap");',
     '.roast-annotation {',
     '  position: relative;',
-    '  display: block;',
+    '  display: inline-block;',
     '  font-family: "Caveat", cursive;',
     '  pointer-events: none;',
-    '  white-space: nowrap;',
     '  text-shadow: 0 1px 8px rgba(0,0,0,0.6);',
     '  line-height: 1.3;',
     '  animation: roastFadeIn 0.5s ease forwards;',
     '  opacity: 0;',
-    '  margin: 4px 0 8px 0;',
+    '  margin: 4px 8px 8px 0;',
     '  z-index: 99999;',
-    '}',
-    '.roast-annotation--vc {',
-    '  color: #00E5FF;',
-    '  font-weight: 700;',
-    '  font-size: 18px;',
-    '}',
-    '.roast-annotation--beamter {',
-    '  color: #C0392B;',
-    '  font-weight: 400;',
     '  font-size: 15px;',
-    '  font-style: italic;',
+    '  font-weight: 500;',
+    '}',
+    '.roast-annotation-wrap {',
+    '  display: flex;',
+    '  flex-wrap: wrap;',
+    '  gap: 4px 12px;',
+    '  margin: 4px 0 8px 0;',
+    '}',
+    '.roast-annotation-label {',
+    '  font-family: sans-serif;',
+    '  font-size: 9px;',
+    '  font-weight: 700;',
+    '  letter-spacing: 0.5px;',
+    '  text-transform: uppercase;',
+    '  opacity: 0.7;',
+    '  display: block;',
+    '  margin-bottom: 1px;',
     '}',
     '@keyframes roastFadeIn {',
     '  from { opacity: 0; transform: scale(0.8) rotate(-2deg); }',
@@ -81,39 +89,72 @@ export function getBridgeScript(): string {
   }
 
   function removeAnnotations() {
-    var existing = document.querySelectorAll('.roast-annotation');
+    var existing = document.querySelectorAll('.roast-annotation-wrap');
     for (var i = 0; i < existing.length; i++) {
       existing[i].parentNode.removeChild(existing[i]);
     }
-    annotationEls = {};
   }
 
-  function createAnnotations(mode, roastData) {
+  function createAnnotations() {
     removeAnnotations();
-    if (!mode || !roastData) return;
+    if (!atRoastData) return;
 
-    var persona = roastData[mode];
-    if (!persona || !persona.sectionRoasts) return;
+    var personaIds = Object.keys(atRoastData);
+    var sectionIds = Object.keys(headingMap);
 
-    var ids = Object.keys(headingMap);
-    for (var i = 0; i < ids.length; i++) {
-      var id = ids[i];
-      var roast = persona.sectionRoasts[id];
-      if (!roast || !roast.annotation) continue;
-
-      var headingEl = headingMap[id];
+    for (var si = 0; si < sectionIds.length; si++) {
+      var sectionId = sectionIds[si];
+      var headingEl = headingMap[sectionId];
       if (!headingEl) continue;
 
-      var ann = document.createElement('div');
-      ann.className = 'roast-annotation roast-annotation--' + mode;
-      ann.textContent = roast.annotation;
-      annotationEls[id] = ann;
+      // Collect annotations from all personas for this section
+      var annotations = [];
+      for (var pi = 0; pi < personaIds.length; pi++) {
+        var pid = personaIds[pi];
+        var persona = atRoastData[pid];
+        if (!persona || !persona.sectionRoasts) continue;
+        var roast = persona.sectionRoasts[sectionId];
+        if (!roast || !roast.annotation) continue;
+        annotations.push({ personaId: pid, text: roast.annotation });
+      }
+
+      // Round-robin: pick 2-3 annotations per section to avoid clutter
+      // Offset by section index so different personas show on different sections
+      var maxPerSection = annotations.length <= 3 ? annotations.length : 2 + (si % 2);
+      var offset = si % annotations.length;
+      var selected = [];
+      for (var k = 0; k < maxPerSection && k < annotations.length; k++) {
+        selected.push(annotations[(offset + k) % annotations.length]);
+      }
+
+      if (selected.length === 0) continue;
+
+      // Create wrapper div
+      var wrap = document.createElement('div');
+      wrap.className = 'roast-annotation-wrap';
+
+      for (var a = 0; a < selected.length; a++) {
+        var ann = document.createElement('div');
+        ann.className = 'roast-annotation';
+        var color = personaColors[selected[a].personaId] || '#e8dcc0';
+        ann.style.color = color;
+        ann.style.animationDelay = (a * 0.15) + 's';
+
+        var label = document.createElement('span');
+        label.className = 'roast-annotation-label';
+        label.style.color = color;
+        label.textContent = selected[a].personaId;
+
+        ann.appendChild(label);
+        ann.appendChild(document.createTextNode(selected[a].text));
+        wrap.appendChild(ann);
+      }
 
       // Insert after the heading
       if (headingEl.nextSibling) {
-        headingEl.parentNode.insertBefore(ann, headingEl.nextSibling);
+        headingEl.parentNode.insertBefore(wrap, headingEl.nextSibling);
       } else {
-        headingEl.parentNode.appendChild(ann);
+        headingEl.parentNode.appendChild(wrap);
       }
     }
   }
@@ -127,7 +168,6 @@ export function getBridgeScript(): string {
     observer = new IntersectionObserver(function(entries) {
       for (var i = 0; i < entries.length; i++) {
         if (entries[i].isIntersecting) {
-          // Find section id for this element
           for (var id in headingMap) {
             if (headingMap[id] === entries[i].target) {
               window.parent.postMessage({
@@ -166,17 +206,13 @@ export function getBridgeScript(): string {
     if (!msg || !msg.type) return;
 
     if (msg.type === 'roast-init') {
-      sectionData = msg.roastData;
+      atRoastData = msg.atRoastData;
+      personaColors = msg.personaColors || {};
       var sectionIds = msg.sectionIds || [];
       discoverHeadings(sectionIds);
       setupObserver();
       setupScrollListener();
-
-      // If there is already an active mode, apply annotations
-      if (msg.mode) {
-        currentMode = msg.mode;
-        createAnnotations(currentMode, sectionData);
-      }
+      createAnnotations();
 
       // Report the first visible section
       if (sectionIds.length > 0) {
@@ -188,11 +224,6 @@ export function getBridgeScript(): string {
           }, '*');
         }
       }
-    }
-
-    if (msg.type === 'roast-set-mode') {
-      currentMode = msg.mode || '';
-      createAnnotations(currentMode, sectionData);
     }
   });
 

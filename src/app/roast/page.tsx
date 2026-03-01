@@ -4,16 +4,17 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { usePersona } from '@/context/PersonaContext';
 import RoastFrame from '@/components/RoastFrame';
-import PersonaToggle from '@/components/PersonaToggle';
 import CommentatorBar from '@/components/CommentatorBar';
+import ChadTransition from '@/components/ChadTransition';
+import ChadPage from '@/components/ChadPage';
+import ShareScreen from '@/components/ShareScreen';
 import LoadingState from '@/components/LoadingState';
-import ShareCard from '@/components/ShareCard';
 import type { ScrapedContent } from '@/types';
 
 function RoastContent() {
   const searchParams = useSearchParams();
   const url = searchParams.get('url');
-  const { setRoastData, setIsLoading, roastData } = usePersona();
+  const { phase, setPhase, setRoastData, setIsLoading, roastData } = usePersona();
   const [stage, setStage] = useState<'scraping' | 'generating' | 'done'>('scraping');
   const [error, setError] = useState('');
   const [scrapedContent, setScrapedContent] = useState<ScrapedContent | null>(null);
@@ -38,6 +39,7 @@ function RoastContent() {
         // Step 1: Scrape
         setStage('scraping');
         setIsLoading(true);
+        setPhase('loading');
 
         const scrapeRes = await fetch('/api/scrape', {
           method: 'POST',
@@ -72,6 +74,7 @@ function RoastContent() {
         setRoastData(roastData);
         setStage('done');
         setIsLoading(false);
+        setPhase('website');
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Etwas ist schiefgelaufen');
@@ -83,7 +86,7 @@ function RoastContent() {
     loadRoast();
 
     return () => { cancelled = true; };
-  }, [url, setRoastData, setIsLoading]);
+  }, [url, setRoastData, setIsLoading, setPhase]);
 
   if (!url) {
     return (
@@ -104,6 +107,17 @@ function RoastContent() {
     );
   }
 
+  // Phase: Chad full page
+  if (phase === 'chad') {
+    return <ChadPage />;
+  }
+
+  // Phase: Share screen
+  if (phase === 'share') {
+    return <ShareScreen scrapedContent={scrapedContent} />;
+  }
+
+  // Phase: loading or website (with iframe)
   return (
     <div className="roast-container">
       {/* URL bar */}
@@ -123,19 +137,16 @@ function RoastContent() {
         />
       </div>
 
-      {/* Persona UI */}
-      <PersonaToggle />
-      <CommentatorBar persona="vc" visibleSectionId={visibleSectionId} />
-      <CommentatorBar persona="beamter" visibleSectionId={visibleSectionId} />
+      {/* CommentatorBar: cycles through AT persona comments */}
+      {roastData && (
+        <CommentatorBar visibleSectionId={visibleSectionId} />
+      )}
 
-      {/* Share card at bottom */}
-      <ShareCard
-        scrapedContent={scrapedContent}
-        visible={reachedBottom && !!roastData}
-      />
+      {/* Chad transition at bottom */}
+      <ChadTransition visible={reachedBottom && !!roastData} />
 
       {/* Loading overlay */}
-      {!roastData && <LoadingState stage={stage} />}
+      {phase === 'loading' && <LoadingState stage={stage} />}
     </div>
   );
 }

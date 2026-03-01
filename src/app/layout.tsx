@@ -22,11 +22,11 @@ const caveat = Caveat({
 });
 
 export const metadata: Metadata = {
-  title: "Roast my Startup",
-  description: "Ein VC-Bro und ein Wiener Grantler bewerten deine Startup-Website.",
+  title: "Roast my Startup: Austria Edition",
+  description: "Fünf österreichische Archetypen + ein Silicon-Valley-VC-Bro bewerten deine Startup-Website.",
   openGraph: {
-    title: "Roast my Startup",
-    description: "Zwei Perspektiven, die kein Startup hören will.",
+    title: "Roast my Startup: Austria Edition",
+    description: "Finde heraus, was Österreich wirklich von deiner Idee hält.",
     type: "website",
   },
 };
