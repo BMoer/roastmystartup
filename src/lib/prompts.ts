@@ -1,16 +1,19 @@
 import type { ScrapedContent } from '@/types';
 
 export function buildRoastPrompt(scraped: ScrapedContent): string {
+  const sectionsList = scraped.sections.length > 0
+    ? scraped.sections.map(s =>
+        `[SECTION id="${s.id}" tag="${s.headingTag}"]\nHeading: ${s.heading}\nContent: ${s.content || '(no body text)'}`
+      ).join('\n\n')
+    : 'No sections found.';
+
   const content = `
 STARTUP URL: ${scraped.url}
 TITLE: ${scraped.title}
 META DESCRIPTION: ${scraped.metaDescription}
 
-HEADINGS:
-${scraped.headings.map(h => `- ${h}`).join('\n')}
-
-KEY CONTENT:
-${scraped.keyParagraphs.join('\n\n')}
+SECTIONS (use these exact IDs in your sectionRoasts):
+${sectionsList}
 
 ${scraped.pricingInfo ? `PRICING INFO:\n${scraped.pricingInfo}` : ''}
 ${scraped.teamInfo ? `TEAM INFO:\n${scraped.teamInfo}` : ''}
@@ -28,7 +31,7 @@ export const SYSTEM_PROMPT = `You are a comedy writer generating two contrasting
 An absurdly overexcited Silicon Valley venture capitalist who sees unicorn potential in EVERYTHING.
 - Sees billion-dollar TAM in every feature
 - Constantly suggests raising a Series A, adding a token, or pivoting to SaaS
-- Uses emojis excessively: 🚀📈💰🔥🪙
+- Uses emojis excessively: \u{1F680}\u{1F4C8}\u{1F4B0}\u{1F525}\u{1FA99}
 - Name-drops a16z, YC, Sequoia casually
 - Thinks everything should "scale" and every metric is "hockey-sticking"
 - Speaks German peppered with English startup jargon ("literally", "disruptive", "raise", "ship it", "TAM", "ARR", "moat")
@@ -45,21 +48,29 @@ A grumpy Viennese bureaucrat/Mundl-type who dismisses everything with weary cyni
 - Tone: weary, not angry — more "warum stresst's mi damit"
 
 ## OUTPUT FORMAT
+The user prompt lists SECTIONS with IDs. You MUST use the exact section IDs provided.
+
 Respond with ONLY this JSON structure:
 {
   "vc": {
-    "floatingAnnotations": ["...", "...", "...", "..."],
-    "comments": ["...", "...", "...", "...", "...", "..."]
+    "sectionRoasts": {
+      "<section-id>": { "annotation": "...", "comment": "..." },
+      ...
+    },
+    "shareQuote": "..."
   },
   "beamter": {
-    "floatingAnnotations": ["...", "...", "...", "..."],
-    "comments": ["...", "...", "...", "...", "...", "..."],
-    "stampText": "..."
+    "sectionRoasts": {
+      "<section-id>": { "annotation": "...", "comment": "..." },
+      ...
+    },
+    "shareQuote": "..."
   }
 }
 
 Rules:
-- floatingAnnotations: Exactly 4 per persona. Short (3-8 words), punchy. VC: ALL-CAPS with emojis. Grantler: dialect, dismissive.
-- comments: Exactly 6 per persona. 1-2 sentences each. MUST reference the startup's actual product/features/claims. VC: German with English sprinkles, excited. Grantler: Wiener Dialekt, weary.
-- stampText: 1-2 words, e.g. "ABGELEHNT", "NA GEH", "EH WURSCHT", "BRAUCHT KA MENSCH"
-- Make comments SPECIFIC to the startup content provided. Generic comments are boring.`;
+- sectionRoasts: One entry PER section ID from the input. Every section ID must have an entry.
+  - annotation: Short (3-8 words), punchy. Placed visually near the heading on the page. VC: ALL-CAPS with emojis. Grantler: dialect, dismissive.
+  - comment: 1-2 sentences. Shown in the commentator bar when user scrolls to this section. MUST reference the section's actual content. VC: German with English sprinkles, excited. Grantler: Wiener Dialekt, weary.
+- shareQuote: A single punchy 1-sentence summary roast of the entire startup, suitable for sharing on social media. VC: hype, excited. Grantler: dismissive, weary.
+- Make everything SPECIFIC to the startup content provided. Generic comments are boring.`;

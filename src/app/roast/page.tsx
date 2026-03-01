@@ -1,14 +1,13 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { usePersona } from '@/context/PersonaContext';
 import RoastFrame from '@/components/RoastFrame';
-import FilterOverlays from '@/components/FilterOverlays';
-import FloatingAnnotations from '@/components/FloatingAnnotations';
 import PersonaToggle from '@/components/PersonaToggle';
 import CommentatorBar from '@/components/CommentatorBar';
 import LoadingState from '@/components/LoadingState';
+import ShareCard from '@/components/ShareCard';
 import type { ScrapedContent } from '@/types';
 
 function RoastContent() {
@@ -17,6 +16,17 @@ function RoastContent() {
   const { setRoastData, setIsLoading, roastData } = usePersona();
   const [stage, setStage] = useState<'scraping' | 'generating' | 'done'>('scraping');
   const [error, setError] = useState('');
+  const [scrapedContent, setScrapedContent] = useState<ScrapedContent | null>(null);
+  const [visibleSectionId, setVisibleSectionId] = useState<string | null>(null);
+  const [reachedBottom, setReachedBottom] = useState(false);
+
+  const handleSectionVisible = useCallback((sectionId: string) => {
+    setVisibleSectionId(sectionId);
+  }, []);
+
+  const handleReachedBottom = useCallback(() => {
+    setReachedBottom(true);
+  }, []);
 
   useEffect(() => {
     if (!url) return;
@@ -39,8 +49,9 @@ function RoastContent() {
           throw new Error('Scraping fehlgeschlagen');
         }
 
-        const scrapedContent: ScrapedContent = await scrapeRes.json();
+        const scraped: ScrapedContent = await scrapeRes.json();
         if (cancelled) return;
+        setScrapedContent(scraped);
 
         // Step 2: Generate
         setStage('generating');
@@ -48,7 +59,7 @@ function RoastContent() {
         const genRes = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scrapedContent }),
+          body: JSON.stringify({ scrapedContent: scraped }),
         });
 
         if (!genRes.ok) {
@@ -78,7 +89,7 @@ function RoastContent() {
     return (
       <div className="roast-error-page">
         <h1>Keine URL angegeben</h1>
-        <a href="/" className="back-link">Zurück zur Startseite</a>
+        <a href="/" className="back-link">Zur&uuml;ck zur Startseite</a>
       </div>
     );
   }
@@ -104,15 +115,24 @@ function RoastContent() {
 
       {/* Main content */}
       <div className="roast-main">
-        <RoastFrame url={url} />
-        <FloatingAnnotations />
-        <FilterOverlays />
+        <RoastFrame
+          url={url}
+          scrapedContent={scrapedContent}
+          onSectionVisible={handleSectionVisible}
+          onReachedBottom={handleReachedBottom}
+        />
       </div>
 
       {/* Persona UI */}
       <PersonaToggle />
-      <CommentatorBar persona="vc" />
-      <CommentatorBar persona="beamter" />
+      <CommentatorBar persona="vc" visibleSectionId={visibleSectionId} />
+      <CommentatorBar persona="beamter" visibleSectionId={visibleSectionId} />
+
+      {/* Share card at bottom */}
+      <ShareCard
+        scrapedContent={scrapedContent}
+        visible={reachedBottom && !!roastData}
+      />
 
       {/* Loading overlay */}
       {!roastData && <LoadingState stage={stage} />}

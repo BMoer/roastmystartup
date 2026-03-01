@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: 3000,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
     });
@@ -36,9 +36,9 @@ export async function POST(request: NextRequest) {
 
     const roastData: RoastData = JSON.parse(jsonStr);
 
-    // Validate structure
-    if (!roastData.vc?.floatingAnnotations || !roastData.vc?.comments ||
-        !roastData.beamter?.floatingAnnotations || !roastData.beamter?.comments) {
+    // Validate new structure
+    if (!roastData.vc?.sectionRoasts || !roastData.vc?.shareQuote ||
+        !roastData.beamter?.sectionRoasts || !roastData.beamter?.shareQuote) {
       return NextResponse.json({ error: 'Invalid response structure' }, { status: 500 });
     }
 

@@ -5,45 +5,60 @@ import { usePersona } from '@/context/PersonaContext';
 import AvatarVC from './AvatarVC';
 import AvatarBeamter from './AvatarBeamter';
 
-const COMMENT_INTERVAL = 6000;
-
 interface Props {
   persona: 'vc' | 'beamter';
+  visibleSectionId: string | null;
 }
 
-export default function CommentatorBar({ persona }: Props) {
+export default function CommentatorBar({ persona, visibleSectionId }: Props) {
   const { mode, setMode, roastData } = usePersona();
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [displayedComment, setDisplayedComment] = useState('');
   const [isFading, setIsFading] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevSectionRef = useRef<string | null>(null);
 
   const isVisible = mode === persona;
-  const comments = roastData?.[persona]?.comments || [];
+  const sectionRoasts = roastData?.[persona]?.sectionRoasts;
 
-  // Rotate comments
+  // Update comment when visible section changes
   useEffect(() => {
-    if (!isVisible || comments.length <= 1) return;
+    if (!isVisible || !sectionRoasts) return;
 
-    intervalRef.current = setInterval(() => {
+    // Determine which comment to show
+    let comment = '';
+    if (visibleSectionId && sectionRoasts[visibleSectionId]) {
+      comment = sectionRoasts[visibleSectionId].comment;
+    } else {
+      // Fallback: first section's comment
+      const firstKey = Object.keys(sectionRoasts)[0];
+      if (firstKey) {
+        comment = sectionRoasts[firstKey].comment;
+      }
+    }
+
+    if (!comment) return;
+
+    // If the section changed, fade transition
+    if (prevSectionRef.current !== visibleSectionId && prevSectionRef.current !== null) {
       setIsFading(true);
-      setTimeout(() => {
-        setCurrentIndex(prev => (prev + 1) % comments.length);
+      const timeout = setTimeout(() => {
+        setDisplayedComment(comment);
         setIsFading(false);
       }, 400);
-    }, COMMENT_INTERVAL);
+      prevSectionRef.current = visibleSectionId;
+      return () => clearTimeout(timeout);
+    } else {
+      setDisplayedComment(comment);
+      prevSectionRef.current = visibleSectionId;
+    }
+  }, [isVisible, visibleSectionId, sectionRoasts]);
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isVisible, comments.length]);
-
-  // Reset index when mode changes
+  // Reset when mode changes
   useEffect(() => {
-    setCurrentIndex(0);
+    prevSectionRef.current = null;
     setIsFading(false);
   }, [mode]);
 
-  if (comments.length === 0) return null;
+  if (!displayedComment) return null;
 
   const Avatar = persona === 'vc' ? AvatarVC : AvatarBeamter;
 
@@ -54,7 +69,7 @@ export default function CommentatorBar({ persona }: Props) {
       </div>
       <div className="speech-bubble">
         <span className={`speech-text ${isFading ? 'is-fading' : ''}`}>
-          {comments[currentIndex]}
+          {displayedComment}
         </span>
       </div>
       <button

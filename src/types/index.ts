@@ -1,15 +1,10 @@
 export type PersonaMode = '' | 'vc' | 'beamter';
 
-export interface RoastData {
-  vc: {
-    floatingAnnotations: string[];
-    comments: string[];
-  };
-  beamter: {
-    floatingAnnotations: string[];
-    comments: string[];
-    stampText: string;
-  };
+export interface ScrapedSection {
+  id: string;
+  heading: string;
+  headingTag: 'h1' | 'h2' | 'h3';
+  content: string;
 }
 
 export interface ScrapedContent {
@@ -22,4 +17,21 @@ export interface ScrapedContent {
   teamInfo: string | null;
   ctaTexts: string[];
   techBuzzwords: string[];
+  sections: ScrapedSection[];
+  logoUrl: string | null;
+}
+
+export interface SectionRoast {
+  annotation: string;
+  comment: string;
+}
+
+export interface PersonaRoast {
+  sectionRoasts: Record<string, SectionRoast>;
+  shareQuote: string;
+}
+
+export interface RoastData {
+  vc: PersonaRoast;
+  beamter: PersonaRoast;
 }

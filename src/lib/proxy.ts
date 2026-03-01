@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { getBridgeScript } from './bridge-script';
 
 /**
  * Validates that a URL is safe to proxy (no private IPs, localhost, etc.)
@@ -35,6 +36,7 @@ export function isUrlSafe(urlStr: string): boolean {
  * - Injects <base href> for relative URL resolution
  * - Removes X-Frame-Options meta tags
  * - Removes CSP meta tags
+ * - Injects bridge script for parent<->iframe communication
  */
 export function rewriteHtml(html: string, baseUrl: string): string {
   const $ = cheerio.load(html);
@@ -59,6 +61,10 @@ export function rewriteHtml(html: string, baseUrl: string): string {
       $(el).remove();
     }
   });
+
+  // Inject bridge script at end of body
+  const bridgeScript = getBridgeScript();
+  $('body').append(`<script>${bridgeScript}</script>`);
 
   return $.html();
 }

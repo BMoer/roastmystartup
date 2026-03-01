@@ -1,16 +1,87 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { usePersona } from '@/context/PersonaContext';
+import type { ScrapedContent } from '@/types';
 
 interface Props {
   url: string;
+  scrapedContent: ScrapedContent | null;
+  onSectionVisible: (sectionId: string) => void;
+  onReachedBottom: () => void;
 }
 
-export default function RoastFrame({ url }: Props) {
+export default function RoastFrame({ url, scrapedContent, onSectionVisible, onReachedBottom }: Props) {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const bridgeReady = useRef(false);
+  const pendingInit = useRef(false);
+  const { mode, roastData } = usePersona();
 
   const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+
+  // Send init to bridge when both bridge is ready and roast data is available
+  const sendInit = useCallback(() => {
+    if (!bridgeReady.current || !roastData || !scrapedContent) {
+      pendingInit.current = true;
+      return;
+    }
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+
+    const sectionIds = scrapedContent.sections.map(s => s.id);
+    iframe.contentWindow.postMessage({
+      type: 'roast-init',
+      sectionIds,
+      roastData,
+      mode,
+    }, '*');
+    pendingInit.current = false;
+  }, [roastData, scrapedContent, mode]);
+
+  // Send mode changes to bridge
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow || !bridgeReady.current) return;
+    iframe.contentWindow.postMessage({
+      type: 'roast-set-mode',
+      mode,
+    }, '*');
+  }, [mode]);
+
+  // Listen for bridge messages
+  useEffect(() => {
+    function handleMessage(e: MessageEvent) {
+      const msg = e.data;
+      if (!msg || !msg.type) return;
+
+      if (msg.type === 'roast-bridge-loaded') {
+        bridgeReady.current = true;
+        if (pendingInit.current || roastData) {
+          sendInit();
+        }
+      }
+
+      if (msg.type === 'roast-section-visible' && msg.sectionId) {
+        onSectionVisible(msg.sectionId);
+      }
+
+      if (msg.type === 'roast-reached-bottom') {
+        onReachedBottom();
+      }
+    }
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [sendInit, onSectionVisible, onReachedBottom, roastData]);
+
+  // Re-send init when roastData or scrapedContent becomes available
+  useEffect(() => {
+    if (roastData && scrapedContent && bridgeReady.current) {
+      sendInit();
+    }
+  }, [roastData, scrapedContent, sendInit]);
 
   return (
     <div className="roast-frame">
@@ -29,6 +100,7 @@ export default function RoastFrame({ url }: Props) {
       )}
 
       <iframe
+        ref={iframeRef}
         src={proxyUrl}
         className="roast-iframe"
         sandbox="allow-scripts allow-same-origin"
