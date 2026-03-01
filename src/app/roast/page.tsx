@@ -4,9 +4,6 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { usePersona } from '@/context/PersonaContext';
 import RoastFrame from '@/components/RoastFrame';
-import CommentatorBar from '@/components/CommentatorBar';
-import ChadTransition from '@/components/ChadTransition';
-import ChadPage from '@/components/ChadPage';
 import ShareScreen from '@/components/ShareScreen';
 import LoadingState from '@/components/LoadingState';
 import type { ScrapedContent } from '@/types';
@@ -19,15 +16,16 @@ function RoastContent() {
   const [error, setError] = useState('');
   const [scrapedContent, setScrapedContent] = useState<ScrapedContent | null>(null);
   const [visibleSectionId, setVisibleSectionId] = useState<string | null>(null);
-  const [reachedBottom, setReachedBottom] = useState(false);
 
   const handleSectionVisible = useCallback((sectionId: string) => {
     setVisibleSectionId(sectionId);
   }, []);
 
   const handleReachedBottom = useCallback(() => {
-    setReachedBottom(true);
-  }, []);
+    if (roastData) {
+      setPhase('share');
+    }
+  }, [roastData, setPhase]);
 
   useEffect(() => {
     if (!url) return;
@@ -107,11 +105,6 @@ function RoastContent() {
     );
   }
 
-  // Phase: Chad full page
-  if (phase === 'chad') {
-    return <ChadPage />;
-  }
-
   // Phase: Share screen
   if (phase === 'share') {
     return <ShareScreen scrapedContent={scrapedContent} />;
@@ -136,14 +129,6 @@ function RoastContent() {
           onReachedBottom={handleReachedBottom}
         />
       </div>
-
-      {/* CommentatorBar: cycles through AT persona comments */}
-      {roastData && (
-        <CommentatorBar visibleSectionId={visibleSectionId} />
-      )}
-
-      {/* Chad transition at bottom */}
-      <ChadTransition visible={reachedBottom && !!roastData} />
 
       {/* Loading overlay */}
       {phase === 'loading' && <LoadingState stage={stage} />}

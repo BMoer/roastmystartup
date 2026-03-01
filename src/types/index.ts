@@ -1,6 +1,6 @@
 export type ATPersonaId = 'franky' | 'pflichtner' | 'sabine' | 'florian' | 'renate';
 export type PersonaId = ATPersonaId | 'chad';
-export type Phase = 'loading' | 'website' | 'transition' | 'chad' | 'share';
+export type Phase = 'loading' | 'website' | 'share';
 
 export interface PersonaMeta {
   id: PersonaId;
@@ -55,17 +55,11 @@ export interface PersonaRoast {
   shareQuote: string;
 }
 
-export interface ChadRoast {
-  tooSmall: string;
-  blowUp: string;
-  shareQuote: string;
-}
-
 export interface RoastData {
   franky: PersonaRoast;
   pflichtner: PersonaRoast;
   sabine: PersonaRoast;
   florian: PersonaRoast;
   renate: PersonaRoast;
-  chad: ChadRoast;
+  chad: PersonaRoast;
 }

@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePersona } from '@/context/PersonaContext';
-import { AT_PERSONAS } from '@/types';
-import type { ScrapedContent, ATPersonaId } from '@/types';
+import { ALL_PERSONAS } from '@/types';
+import { AVATAR_MINI_SVGS } from '@/lib/avatar-mini-svgs';
+import type { ScrapedContent, PersonaId } from '@/types';
 
 interface Props {
   url: string;
@@ -22,23 +23,28 @@ export default function RoastFrame({ url, scrapedContent, onSectionVisible, onRe
 
   const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
 
-  // Build persona color map from AT_PERSONAS
+  // Build persona maps from ALL_PERSONAS
   const personaColors: Record<string, string> = {};
-  for (const p of AT_PERSONAS) {
+  const personaNames: Record<string, string> = {};
+  const personaAvatarSvgs: Record<string, string> = {};
+  for (const p of ALL_PERSONAS) {
     personaColors[p.id] = p.color;
+    personaNames[p.id] = p.name;
+    personaAvatarSvgs[p.id] = AVATAR_MINI_SVGS[p.id as PersonaId];
   }
 
-  // Build AT-only roast data (exclude chad)
-  const atRoastData = roastData ? {
+  // All persona roast data
+  const allRoastData = roastData ? {
     franky: roastData.franky,
     pflichtner: roastData.pflichtner,
     sabine: roastData.sabine,
     florian: roastData.florian,
     renate: roastData.renate,
+    chad: roastData.chad,
   } : null;
 
   const sendInit = useCallback(() => {
-    if (!bridgeReady.current || !atRoastData || !scrapedContent) {
+    if (!bridgeReady.current || !allRoastData || !scrapedContent) {
       pendingInit.current = true;
       return;
     }
@@ -49,8 +55,10 @@ export default function RoastFrame({ url, scrapedContent, onSectionVisible, onRe
     iframe.contentWindow.postMessage({
       type: 'roast-init',
       sectionIds,
-      atRoastData,
+      atRoastData: allRoastData,
       personaColors,
+      personaNames,
+      personaAvatarSvgs,
     }, '*');
     pendingInit.current = false;
   }, [roastData, scrapedContent]); // eslint-disable-line react-hooks/exhaustive-deps

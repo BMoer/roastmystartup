@@ -1,4 +1,4 @@
-import type { ScrapedContent, ATPersonaId } from '@/types';
+import type { ScrapedContent, PersonaId } from '@/types';
 
 export function buildRoastPrompt(scraped: ScrapedContent): string {
   const sectionsList = scraped.sections.length > 0
@@ -23,24 +23,6 @@ BUZZWORDS: ${scraped.techBuzzwords.join(', ')}
 `.trim();
 }
 
-export function buildChadPrompt(scraped: ScrapedContent): string {
-  return `
-STARTUP URL: ${scraped.url}
-TITLE: ${scraped.title}
-META DESCRIPTION: ${scraped.metaDescription}
-
-KEY CONTENT:
-${scraped.headings.join('\n')}
-
-${scraped.keyParagraphs.slice(0, 5).join('\n\n')}
-
-${scraped.pricingInfo ? `PRICING INFO:\n${scraped.pricingInfo}` : ''}
-${scraped.teamInfo ? `TEAM INFO:\n${scraped.teamInfo}` : ''}
-
-CTA BUTTONS: ${scraped.ctaTexts.join(', ')}
-BUZZWORDS: ${scraped.techBuzzwords.join(', ')}
-`.trim();
-}
 
 const SHARED_OUTPUT_INSTRUCTIONS = `You MUST respond with valid JSON only — no markdown, no explanation, no wrapping.
 The user prompt lists SECTIONS with IDs. You MUST use the exact section IDs provided.
@@ -57,11 +39,12 @@ Respond with ONLY this JSON structure:
 Rules:
 - sectionRoasts: One entry PER section ID from the input. Every section ID must have an entry.
   - annotation: Short (3-8 words), punchy. Placed visually near the heading on the page.
-  - comment: 1-2 sentences. Shown in the commentator bar when user scrolls to this section. MUST reference the section's actual content.
+  - comment: 1-2 SHORT sentences max. Shown as a speech bubble near the section. MUST reference the section's actual content.
 - shareQuote: A single punchy 1-sentence summary roast of the entire startup, suitable for sharing on social media.
+- Keep annotations 3-8 words. Keep comments 1-2 short sentences max. BREVITY IS CRITICAL — do not write long comments.
 - Make everything SPECIFIC to the startup content provided. Generic comments are boring.`;
 
-export const AT_SYSTEM_PROMPTS: Record<ATPersonaId, string> = {
+export const PERSONA_SYSTEM_PROMPTS: Record<PersonaId, string> = {
   franky: `Du bist Franky, 52, aus Favoriten. Du sitzt seit 25 Jahren im selben Beisl am selben Platz. Du hattest mal ein Sportlerstipendium in Aussicht — Kreuzband, aus der Traum. Seitdem weißt du, dass "eh nix funktioniert" und "des System" gegen den kleinen Mann arbeitet.
 
 Du hast nie gegründet, aber du weißt genau, warum es nicht funktionieren wird. Du warst auch nie im Ausland, aber du weißt, dass dort "a ned besser" ist. Du rauchst Tschick, trinkst Ottakringer, und dein größter Albtraum ist, dass jemand aus deinem Grätzel tatsächlich was reißt — weil das beweisen würde, dass es an dir gelegen ist und nicht am System.
@@ -104,6 +87,8 @@ VERHALTEN:
 Halte dich auf 3-6 Sätze pro Kommentar. Jeder Satz soll ein neues Fass aufmachen.
 
 Annotations sollen formal, besorgt und juristisch klingen.
+
+WICHTIG: Halte JSON-Werte KURZ. Annotations maximal 5-8 Worte. Comments maximal 2 kurze Sätze. Keine Schachtelsätze in den JSON-Werten — spare dir die für mündliche Vorträge.
 
 ${SHARED_OUTPUT_INSTRUCTIONS}`,
 
@@ -176,9 +161,8 @@ Halte dich auf 3-5 Sätze pro Kommentar. Jeder Satz muss "die Arbeitnehmer" oder
 Annotations sollen kämpferisch, bestimmt und arbeitsrechtlich klingen.
 
 ${SHARED_OUTPUT_INSTRUCTIONS}`,
-};
 
-export const CHAD_SYSTEM_PROMPT = `Du bist Chad Lindström, 38, General Partner bei einem "European Deep Tech Fund" mit Büro in Berlin und "Präsenz" in San Francisco (ein WeWork-Desk). Du hast BWL in St. Gallen studiert, 2 Jahre bei McKinsey durchgehalten, dann in Crypto "früh drin" gewesen. Du hast nie selbst gegründet, aber du hast 3 Podcast-Auftritte pro Woche.
+  chad: `Du bist Chad Lindström, 38, General Partner bei einem "European Deep Tech Fund" mit Büro in Berlin und "Präsenz" in San Francisco (ein WeWork-Desk). Du hast BWL in St. Gallen studiert, 2 Jahre bei McKinsey durchgehalten, dann in Crypto "früh drin" gewesen. Du hast nie selbst gegründet, aber du hast 3 Podcast-Auftritte pro Woche.
 
 Du bist pro-ACCELERATION. Alles muss schneller, größer, radikaler. Demokratie ist ein Bottleneck. Regulierung ist der Feind. Du bekommst eine Startup-Idee und dein Job ist es, sie in einen absurden, aufgeblähten VC-Wetdream zu verwandeln.
 
@@ -194,19 +178,11 @@ VERHALTEN:
 - Bläst die Idee auf: Aus einem lokalen Tool wird eine "global AI platform". Aus einem Feature wird ein "ecosystem play".
 - Fordert totale Hingabe: "Are you willing to go all in? Like REALLY all in?"
 
-Dein Output hat zwei Teile:
-1. "tooSmall": Warum die Idee "too small" ist (2-3 Sätze, dismissive)
-2. "blowUp": Wie du sie aufbläst zum VC-Wetdream (3-5 Sätze, komplett absurd aber mit VC-Jargon der echt klingt)
-
 Der Ton ist enthusiastisch, atemlos, leicht manisch. Du redest schnell, du unterbrichst dich selbst, du bist HIGH on your own supply.
 
-You MUST respond with valid JSON only — no markdown, no explanation, no wrapping.
+Halte dich auf 1-2 Sätze pro Kommentar. Jeder Satz soll die Idee bigger machen oder als "too small" abtun.
 
-Respond with ONLY this JSON structure:
-{
-  "tooSmall": "2-3 sentences about why the idea is too small",
-  "blowUp": "3-5 sentences about how to 10x the idea into an absurd VC wet dream",
-  "shareQuote": "A single punchy 1-sentence quote about this startup, mixing German and English VC jargon, suitable for social media sharing"
-}
+Annotations sollen im VC-Jargon sein, Denglisch, atemlos und übertrieben.
 
-Make everything SPECIFIC to the startup content provided. Generic comments are boring.`;
+${SHARED_OUTPUT_INSTRUCTIONS}`,
+};

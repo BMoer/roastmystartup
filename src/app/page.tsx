@@ -2,11 +2,17 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import AvatarFranky from '@/components/AvatarFranky';
-import AvatarPflichtner from '@/components/AvatarPflichtner';
-import AvatarSabine from '@/components/AvatarSabine';
-import AvatarFlorian from '@/components/AvatarFlorian';
-import AvatarRenate from '@/components/AvatarRenate';
+import { AVATAR_MAP } from '@/components/avatars';
+import { AT_PERSONAS } from '@/types';
+import type { ATPersonaId } from '@/types';
+
+const PERSONA_BIOS: Record<ATPersonaId, string> = {
+  franky: '52, Favoriten. Stammgast seit 25 Jahren. Kreuzbandriss statt Karriere.',
+  pflichtner: '47, Ministerialrat. Doktorat in Jus. Sieht überall Rechtsgrundlagen-Probleme.',
+  sabine: '44, Teamleiterin Controlling. 18 Jahre im selben Betrieb. Lebt in Excel.',
+  florian: '34, Nachhaltigkeitsberater. 7. Bezirk. Hafer-Matcha und Schuldgefühle.',
+  renate: '56, Gewerkschaftssekretärin GPA-djp. 32 Jahre Arbeitskampf.',
+};
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -40,21 +46,26 @@ export default function Home() {
   return (
     <main className="landing">
       <div className="landing-avatars">
-        <div className="landing-avatar" style={{ animationDelay: '0s' }}>
-          <AvatarFranky size={80} />
-        </div>
-        <div className="landing-avatar" style={{ animationDelay: '0.3s' }}>
-          <AvatarPflichtner size={80} />
-        </div>
-        <div className="landing-avatar" style={{ animationDelay: '0.6s' }}>
-          <AvatarSabine size={80} />
-        </div>
-        <div className="landing-avatar" style={{ animationDelay: '0.9s' }}>
-          <AvatarFlorian size={80} />
-        </div>
-        <div className="landing-avatar" style={{ animationDelay: '1.2s' }}>
-          <AvatarRenate size={80} />
-        </div>
+        {AT_PERSONAS.map((persona, i) => {
+          const Avatar = AVATAR_MAP[persona.id];
+          return (
+            <div
+              key={persona.id}
+              className="landing-avatar"
+              style={{ animationDelay: `${i * 0.3}s` }}
+            >
+              <Avatar size={80} />
+              <div className="landing-avatar-tooltip">
+                <span className="landing-avatar-tooltip-name" style={{ color: persona.color }}>
+                  {persona.name}
+                </span>
+                <span className="landing-avatar-tooltip-desc">
+                  {PERSONA_BIOS[persona.id as ATPersonaId]}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <h1 className="landing-title">

@@ -16,15 +16,24 @@ export default function ShareScreen({ scrapedContent }: Props) {
 
   const getShareQuote = (id: PersonaId): string => {
     if (!roastData) return '';
-    if (id === 'chad') return roastData.chad.shareQuote;
     return roastData[id]?.shareQuote || '';
   };
 
   const handleShareLinkedIn = useCallback(() => {
-    const shareUrl = window.location.href;
-    const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
-    window.open(linkedInUrl, '_blank', 'noopener,noreferrer');
-  }, []);
+    const startupUrl = scrapedContent?.url || '';
+    const shareText = `Mein Startup wurde geroasted! 🔥\n${startupUrl}\n\nroastmystartup.com — Austria Edition`;
+
+    if (navigator.share) {
+      navigator.share({
+        title: 'Roast my Startup',
+        text: shareText,
+        url: window.location.href,
+      }).catch(() => {});
+    } else {
+      const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`;
+      window.open(linkedInUrl, '_blank', 'noopener,noreferrer');
+    }
+  }, [scrapedContent]);
 
   const handleDownloadPng = useCallback(async () => {
     const cardEl = document.getElementById('share-screen-card');
@@ -97,6 +106,9 @@ export default function ShareScreen({ scrapedContent }: Props) {
                 )}
                 <div>
                   <h3 className="share-quote-startup">{title}</h3>
+                  {scrapedContent?.url && (
+                    <p className="share-quote-url">{scrapedContent.url}</p>
+                  )}
                   <p className="share-quote-label">wurde geroasted!</p>
                 </div>
               </div>

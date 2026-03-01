@@ -3,8 +3,9 @@
  * This runs inside the iframe — NOT as React. It communicates with the
  * parent via postMessage.
  *
- * Shows annotations from ALL 5 AT personas simultaneously, limited to
- * 2-3 per section in a round-robin pattern for the "Minenfeld" feel.
+ * Shows speech bubbles from AT personas scattered across the page,
+ * each appearing on scroll via IntersectionObserver. Bubbles sit in
+ * document flow with varied horizontal offsets so they never overlap.
  */
 export function getBridgeScript(): string {
   return `
@@ -12,52 +13,84 @@ export function getBridgeScript(): string {
   if (window.__roastBridgeLoaded) return;
   window.__roastBridgeLoaded = true;
 
-  var atRoastData = null; // { franky: {sectionRoasts}, pflichtner: ..., etc }
-  var personaColors = {}; // personaId -> color hex
-  var headingMap = {}; // sectionId -> DOM element
-  var observer = null;
+  var atRoastData = null;
+  var personaColors = {};
+  var personaNames = {};
+  var personaAvatarSvgs = {};
+  var headingMap = {};
+  var sectionObserver = null;
+  var bubbleObserver = null;
   var bottomReported = false;
 
-  // Inject styles for annotations
   var style = document.createElement('style');
   style.textContent = [
     '@import url("https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;700&display=swap");',
-    '.roast-annotation {',
+    '.roast-bubble-wrap {',
     '  position: relative;',
-    '  display: inline-block;',
-    '  font-family: "Caveat", cursive;',
-    '  pointer-events: none;',
-    '  text-shadow: 0 1px 8px rgba(0,0,0,0.6);',
-    '  line-height: 1.3;',
-    '  animation: roastFadeIn 0.5s ease forwards;',
-    '  opacity: 0;',
-    '  margin: 4px 8px 8px 0;',
     '  z-index: 99999;',
-    '  font-size: 15px;',
-    '  font-weight: 500;',
+    '  pointer-events: none;',
     '}',
-    '.roast-annotation-wrap {',
+    '.roast-speech-bubble {',
     '  display: flex;',
-    '  flex-wrap: wrap;',
-    '  gap: 4px 12px;',
-    '  margin: 4px 0 8px 0;',
+    '  align-items: flex-start;',
+    '  gap: 8px;',
+    '  max-width: 300px;',
+    '  width: fit-content;',
+    '  padding: 10px 14px;',
+    '  border-radius: 14px 14px 14px 4px;',
+    '  background: rgba(14, 13, 11, 0.88);',
+    '  backdrop-filter: blur(8px);',
+    '  -webkit-backdrop-filter: blur(8px);',
+    '  border: 1.5px solid;',
+    '  font-family: "Caveat", cursive;',
+    '  line-height: 1.3;',
+    '  pointer-events: none;',
+    '  box-shadow: 0 4px 20px rgba(0,0,0,0.4);',
+    '  margin-bottom: 6px;',
+    '  opacity: 0;',
+    '  transform: scale(0.85) translateY(12px);',
+    '  transition: opacity 0.5s ease, transform 0.5s ease;',
     '}',
-    '.roast-annotation-label {',
+    '.roast-speech-bubble.is-visible {',
+    '  opacity: 0.92;',
+    '  transform: scale(1) rotate(var(--bubble-rot, -1deg)) translateY(0);',
+    '}',
+    '.roast-bubble-avatar {',
+    '  flex-shrink: 0;',
+    '  width: 28px;',
+    '  height: 28px;',
+    '  border-radius: 50%;',
+    '  overflow: hidden;',
+    '  background: rgba(255,255,255,0.05);',
+    '}',
+    '.roast-bubble-avatar svg {',
+    '  width: 28px;',
+    '  height: 28px;',
+    '}',
+    '.roast-bubble-body {',
+    '  flex: 1;',
+    '  min-width: 0;',
+    '}',
+    '.roast-bubble-name {',
     '  font-family: sans-serif;',
-    '  font-size: 9px;',
+    '  font-size: 10px;',
     '  font-weight: 700;',
     '  letter-spacing: 0.5px;',
     '  text-transform: uppercase;',
-    '  opacity: 0.7;',
     '  display: block;',
-    '  margin-bottom: 1px;',
+    '  margin-bottom: 3px;',
     '}',
-    '@keyframes roastFadeIn {',
-    '  from { opacity: 0; transform: scale(0.8) rotate(-2deg); }',
-    '  to { opacity: 0.85; transform: scale(1) rotate(-1deg); }',
+    '.roast-bubble-text {',
+    '  font-size: 16px;',
+    '  font-weight: 500;',
+    '  text-shadow: 0 1px 6px rgba(0,0,0,0.5);',
     '}',
   ].join('\\n');
   document.head.appendChild(style);
+
+  // Horizontal margin-left offsets (%) to scatter bubbles across the page
+  var marginOffsets = [2, 45, 20, 55, 8, 38, 60, 12, 50, 28, 5, 42];
+  var rotations = [-2, 1, -1, 1.5, -0.5, 2, -1.5, 0.5];
 
   function slugify(text) {
     return text
@@ -88,16 +121,38 @@ export function getBridgeScript(): string {
     }
   }
 
-  function removeAnnotations() {
-    var existing = document.querySelectorAll('.roast-annotation-wrap');
+  function removeBubbles() {
+    if (bubbleObserver) bubbleObserver.disconnect();
+    var existing = document.querySelectorAll('.roast-bubble-wrap');
     for (var i = 0; i < existing.length; i++) {
       existing[i].parentNode.removeChild(existing[i]);
     }
   }
 
-  function createAnnotations() {
-    removeAnnotations();
+  function setupBubbleObserver() {
+    if (bubbleObserver) bubbleObserver.disconnect();
+
+    bubbleObserver = new IntersectionObserver(function(entries) {
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].isIntersecting) {
+          entries[i].target.classList.add('is-visible');
+          bubbleObserver.unobserve(entries[i].target);
+        }
+      }
+    }, { threshold: 0.15 });
+
+    var allBubbles = document.querySelectorAll('.roast-speech-bubble');
+    for (var i = 0; i < allBubbles.length; i++) {
+      bubbleObserver.observe(allBubbles[i]);
+    }
+  }
+
+  var globalBubbleIndex = 0;
+
+  function createSpeechBubbles() {
+    removeBubbles();
     if (!atRoastData) return;
+    globalBubbleIndex = 0;
 
     var personaIds = Object.keys(atRoastData);
     var sectionIds = Object.keys(headingMap);
@@ -107,65 +162,89 @@ export function getBridgeScript(): string {
       var headingEl = headingMap[sectionId];
       if (!headingEl) continue;
 
-      // Collect annotations from all personas for this section
-      var annotations = [];
+      var bubbles = [];
       for (var pi = 0; pi < personaIds.length; pi++) {
         var pid = personaIds[pi];
         var persona = atRoastData[pid];
         if (!persona || !persona.sectionRoasts) continue;
         var roast = persona.sectionRoasts[sectionId];
-        if (!roast || !roast.annotation) continue;
-        annotations.push({ personaId: pid, text: roast.annotation });
+        if (!roast || !roast.comment) continue;
+        bubbles.push({ personaId: pid, comment: roast.comment });
       }
 
-      // Round-robin: pick 2-3 annotations per section to avoid clutter
-      // Offset by section index so different personas show on different sections
-      var maxPerSection = annotations.length <= 3 ? annotations.length : 2 + (si % 2);
-      var offset = si % annotations.length;
+      var maxPerSection = bubbles.length <= 3 ? bubbles.length : 2 + (si % 2);
+      var offset = si % bubbles.length;
       var selected = [];
-      for (var k = 0; k < maxPerSection && k < annotations.length; k++) {
-        selected.push(annotations[(offset + k) % annotations.length]);
+      for (var k = 0; k < maxPerSection && k < bubbles.length; k++) {
+        selected.push(bubbles[(offset + k) % bubbles.length]);
       }
 
       if (selected.length === 0) continue;
 
-      // Create wrapper div
       var wrap = document.createElement('div');
-      wrap.className = 'roast-annotation-wrap';
+      wrap.className = 'roast-bubble-wrap';
 
       for (var a = 0; a < selected.length; a++) {
-        var ann = document.createElement('div');
-        ann.className = 'roast-annotation';
-        var color = personaColors[selected[a].personaId] || '#e8dcc0';
-        ann.style.color = color;
-        ann.style.animationDelay = (a * 0.15) + 's';
+        var item = selected[a];
+        var color = personaColors[item.personaId] || '#e8dcc0';
+        var rot = rotations[globalBubbleIndex % rotations.length];
+        var ml = marginOffsets[globalBubbleIndex % marginOffsets.length];
+        globalBubbleIndex++;
 
-        var label = document.createElement('span');
-        label.className = 'roast-annotation-label';
-        label.style.color = color;
-        label.textContent = selected[a].personaId;
+        var bubble = document.createElement('div');
+        bubble.className = 'roast-speech-bubble';
+        bubble.style.borderColor = color;
+        bubble.style.setProperty('--bubble-rot', rot + 'deg');
+        bubble.style.marginLeft = ml + '%';
 
-        ann.appendChild(label);
-        ann.appendChild(document.createTextNode(selected[a].text));
-        wrap.appendChild(ann);
+        // Avatar
+        var avatarWrap = document.createElement('div');
+        avatarWrap.className = 'roast-bubble-avatar';
+        var svgMarkup = personaAvatarSvgs[item.personaId];
+        if (svgMarkup) {
+          avatarWrap.innerHTML = svgMarkup;
+        }
+
+        // Body (name + text)
+        var body = document.createElement('div');
+        body.className = 'roast-bubble-body';
+
+        var nameEl = document.createElement('span');
+        nameEl.className = 'roast-bubble-name';
+        nameEl.style.color = color;
+        nameEl.textContent = personaNames[item.personaId] || item.personaId;
+
+        var textEl = document.createElement('div');
+        textEl.className = 'roast-bubble-text';
+        textEl.style.color = color;
+        textEl.textContent = item.comment;
+
+        body.appendChild(nameEl);
+        body.appendChild(textEl);
+
+        bubble.appendChild(avatarWrap);
+        bubble.appendChild(body);
+        wrap.appendChild(bubble);
       }
 
-      // Insert after the heading
       if (headingEl.nextSibling) {
         headingEl.parentNode.insertBefore(wrap, headingEl.nextSibling);
       } else {
         headingEl.parentNode.appendChild(wrap);
       }
     }
+
+    // Observe all bubbles for scroll-triggered reveal
+    setupBubbleObserver();
   }
 
   function setupObserver() {
-    if (observer) observer.disconnect();
+    if (sectionObserver) sectionObserver.disconnect();
 
     var ids = Object.keys(headingMap);
     if (ids.length === 0) return;
 
-    observer = new IntersectionObserver(function(entries) {
+    sectionObserver = new IntersectionObserver(function(entries) {
       for (var i = 0; i < entries.length; i++) {
         if (entries[i].isIntersecting) {
           for (var id in headingMap) {
@@ -182,7 +261,7 @@ export function getBridgeScript(): string {
     }, { threshold: 0.3 });
 
     for (var i = 0; i < ids.length; i++) {
-      observer.observe(headingMap[ids[i]]);
+      sectionObserver.observe(headingMap[ids[i]]);
     }
   }
 
@@ -200,7 +279,6 @@ export function getBridgeScript(): string {
     }, { passive: true });
   }
 
-  // Listen for messages from parent
   window.addEventListener('message', function(e) {
     var msg = e.data;
     if (!msg || !msg.type) return;
@@ -208,13 +286,14 @@ export function getBridgeScript(): string {
     if (msg.type === 'roast-init') {
       atRoastData = msg.atRoastData;
       personaColors = msg.personaColors || {};
+      personaNames = msg.personaNames || {};
+      personaAvatarSvgs = msg.personaAvatarSvgs || {};
       var sectionIds = msg.sectionIds || [];
       discoverHeadings(sectionIds);
       setupObserver();
       setupScrollListener();
-      createAnnotations();
+      createSpeechBubbles();
 
-      // Report the first visible section
       if (sectionIds.length > 0) {
         var firstId = sectionIds[0];
         if (headingMap[firstId]) {
@@ -227,7 +306,6 @@ export function getBridgeScript(): string {
     }
   });
 
-  // Tell parent bridge is ready
   window.parent.postMessage({ type: 'roast-bridge-loaded' }, '*');
 })();
 `;
